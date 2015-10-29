@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link href="css/index.css" rel="stylesheet" type="text/css">
+		<script type="text/javascript" src="script/jquery-2.1.1.js" ></script>
+		<script type="text/javascript" src="script/jscolor/jscolor.js"></script>
+		<script type="text/javascript" src="script/Highcharts-4/js/highcharts.js"></script>
+	</head>
+<body>
+
+<div id="display">
+	<canvas id="myCanvas" width="600" height="600" style="border:1px solid #d3d3d3;">
+Your browser does not support the HTML5 canvas tag.</canvas>	
+
+</div>
+
+<div id="function">
+	<button name="function" >Function</button>
+	<button name="evolve">Evolve</button>
+	<br>
+	Select Weak Predator Color<input name="weak-predator-color" class="color" size="5"><br>
+	Select Strong Predator Color<input name="strong-predator-color" class="color" size="5"><br>
+	Select Prey Color<input name="prey-color" class="color" size="5"><br>
+	Select BackgroundColor Color<input name="background-color" class="color" size="5"><br>
+	Weak Predator Breeding Age:<input name="weak-predator-breeding-age" type="range" min="1" max="10" value="6"><input name="weak-predator-breeding-age" type="text" maxLength="2" size="2" value="6" disabled><br>
+	Strong Predator Breeding Age:<input name="strong-predator-breeding-age" type="range" min="1" max="10" value="3"><input name="strong-predator-breeding-age" type="text" maxLength="2" size="2" value="3" disabled><br>
+	Prey Breeding Age:<input name="prey-breeding-age" type="range" min="1" max="10" value="2"><input name="prey-breeding-age" type="text" maxLength="2" size="2" value="2" disabled><br>
+	<div id="container" style="min-width: 410px; height: 400px; margin: 0 auto"></div>
+</body>
+</html>
+
+
+<script>
+
+$(function() {
+
+	var NORTH = 0;
+	var SOUTH = 1;
+	var EAST = 2;
+	var WEST = 3;
+	var DIRECTIONS = [ NORTH, SOUTH, EAST, WEST] ;
+
+	var SIZE = 100	;
+	var TIMER = 100;
+
+	var PREY_PERCENTAGE = 0.60;
+	var WEAK_PREDATOR_PERCENTAGE = 0.10;
+	var STRONG_PREDATOR_PERCENTAGE = 0.05;
+	
+	var WATER = 0;
+	var PREY = 1;
+	var WEAK_PREDATOR = 2;
+	var STRONG_PREDATOR = 3;
+
+	var breedingAges = new Array(4);
+
+	breedingAges[WATER] = 0;
+	breedingAges[PREY] = parseInt($("input[type='text'][name='prey-breeding-age']").val());
+	breedingAges[WEAK_PREDATOR] = parseInt($("input[type='text'][name='weak-predator-breeding-age']").val());
+	breedingAges[STRONG_PREDATOR] = parseInt($("input[type='text'][name='strong-predator-breeding-age']").val());
+
+	var sightDistance = new Array(4);
+	sightDistance[WATER] = 0;
+	sightDistance[PREY] = 5;
+	sightDistance[WEAK_PREDATOR] = 3;
+	sightDistance[STRONG_PREDATOR] = 4;
+
+
+	var PREY_STARTING_AGE = 1;
+	var PREY_BREEDING_STEP = 1;
+	
+
+	var WEAK_PREDATOR_STARTING_AGE = 1;
+
+//cancellare---------------
+	// var WEAK_PREDATOR_STARTING_AGE = 100;
+	//breedingAges[WEAK_PREDATOR] = 100000;
+
+
+	var WEAK_PREDATOR_BREEDING_STEP = 1;
+	var WEAK_PREDATOR_STARVING_STEP = 1;
+	var WEAK_PREDATOR_STARVING_AGE = 1;
+	
+	var STRONG_PREDATOR_STARTING_AGE = 1;
+
+	var PREY_COLOR = "#00FF08";
+	var WEAK_PREDATOR_COLOR = "#FF0000" ;
+	var STRONG_PREDATOR_COLOR = "#000000";
+	var BACKGROUND_COLOR = "#0800FF";
+
+
+	var speciesCount = new Array(4);
+	speciesCount[WATER] = 0;
+	speciesCount[PREY] = 0;
+	speciesCount[WEAK_PREDATOR] = 0;
+	speciesCount[STRONG_PREDATOR] = 0;
+
+	var iterationCounter = 0;
+	
+
+	$("input[class='color']").change(function() {
+		switch($(this).attr('name') ) {
+			case "weak-predator-color":
+				WEAK_PREDATOR_COLOR = "#" + $(this).val();
+			break;
+			case "strong-predator-color":
+				STRONG_PREDATOR_COLOR = "#" + $(this).val();
+			break;
+			case "prey-color":
+				PREY_COLOR = "#" + $(this).val();
+			break;
+			case "background-color":
+				BACKGROUND_COLOR = "#" + $(this).val();
+			break;
+		}
+		draw();
+	});
+
+	$("input[type='range']").change(function() {
+		var fieldName = $(this).attr('name');
+		var newValue = parseInt($(this).val());
+		$("input[type='text'][name='" + fieldName + "']").val(newValue);
+		switch ( fieldName ) {
+			case ( 'weak-predator-breeding-age' ):
+				breedingAges[WEAK_PREDATOR] = newValue;
+			break;
+			case ( 'strong-predator-breeding-age' ):
+				breedingAges[STRONG_PREDATOR] = newValue;
+			break;
+			case ( 'prey-breeding-age' ):
+				breedingAges[PREY] = newValue;
+			break;
+		}
+	});
+
+
+
+	var c = document.getElementById("myCanvas");
+	var ctx = c.getContext("2d");
+	var height = $('#myCanvas').attr("height");
+	var width = $('#myCanvas').attr('width');
+
+	var tileSize = width / SIZE;
+
+	// for ( var i = tileSize ; i < width ; i+= tileSize ) {
+	// 	ctx.moveTo(i,0);
+	// 	ctx.lineTo(i,height);
+	// 	ctx.moveTo(0,i)
+	// 	ctx.lineTo(width,i);
+	// }
+
+	ctx.stroke();
+
+
+
+	var state = [];
+	var newState = [];
+	var tmp;
+	var agingState = [];
+	var newAgingState = [];
+
+	
+	for(var i=0; i<SIZE; i++) {
+	    state[i] = new Array(SIZE);
+	    newState[i] = new Array(SIZE);
+		agingState[i] = new Array(SIZE);
+		newAgingState[i] = new Array(SIZE);
+	}
+
+	for ( var i = 0 ; i < SIZE ; i++ ) {
+		for ( var j = 0 ; j < SIZE ; j++ ) {
+			state[i][j] = 0;
+			newState[i][j] = 0;
+			agingState[i][j] = 0;
+			newAgingState[i][j] = 0;
+		}
+	}
+
+	function init() {
+
+		var PreyToLocate = Math.floor(SIZE * SIZE * PREY_PERCENTAGE);
+		var weakPredatorsToLocate = Math.floor(SIZE * SIZE * WEAK_PREDATOR_PERCENTAGE);
+		var strongPredatorsToLocate = Math.floor(SIZE * SIZE * STRONG_PREDATOR_PERCENTAGE);
+		// var PreyToLocate = 0;
+		// var weakPredatorsToLocate = 0;
+		// var strongPredatorsToLocate = 0;
+		var placed = false;
+
+		speciesCount[PREY] = PreyToLocate;
+		speciesCount[WEAK_PREDATOR] = weakPredatorsToLocate;
+		speciesCount[STRONG_PREDATOR] = strongPredatorsToLocate;
+
+
+		for (var i = 0; i < PreyToLocate; i++) {
+			placed = false;
+
+			do {
+				var randomI = Math.floor( (Math.random() * SIZE ));
+				var randomJ = Math.floor( (Math.random() * SIZE ));
+
+				if ( state[randomI][randomJ] == WATER ) {
+					state[randomI][randomJ] = PREY;
+					newState[randomI][randomJ] = PREY;
+					agingState[randomI][randomJ] = PREY_STARTING_AGE;
+					newAgingState[randomI][randomJ] = PREY_STARTING_AGE;
+					placed = true;
+				} 	
+			} while ( !placed );
+
+		};	
+
+		for (var i = 0; i < weakPredatorsToLocate; i++) {
+			placed = false;
+
+			do {
+				var randomI = Math.floor( (Math.random() * SIZE ));
+				var randomJ = Math.floor( (Math.random() * SIZE ));
+
+				if ( state[randomI][randomJ] == WATER ) {
+					state[randomI][randomJ] = WEAK_PREDATOR;
+					newState[randomI][randomJ] = WEAK_PREDATOR;
+					agingState[randomI][randomJ] = WEAK_PREDATOR_STARTING_AGE;
+					newAgingState[randomI][randomJ] = WEAK_PREDATOR_STARTING_AGE;
+					placed = true;
+				} 	
+			} while ( !placed );
+
+		};
+
+		for (var i = 0; i < strongPredatorsToLocate; i++) {
+			placed = false;
+
+			do {
+				var randomI = Math.floor( (Math.random() * SIZE ));
+				var randomJ = Math.floor( (Math.random() * SIZE ));
+
+				if ( state[randomI][randomJ] == WATER ) {
+					state[randomI][randomJ] = STRONG_PREDATOR;
+					newState[randomI][randomJ] = STRONG_PREDATOR;
+					agingState[randomI][randomJ] = STRONG_PREDATOR_STARTING_AGE;
+					newAgingState[randomI][randomJ] = STRONG_PREDATOR_STARTING_AGE;
+					placed = true;
+				} 	
+			} while ( !placed );
+
+		};
+
+		// cancellare ------------------------------
+
+		 // preyX = 5;
+		 // preyY = 5;
+
+		 // predatorX = 5;
+		 // predatorY = 6;
+
+		 // specie = WEAK_PREDATOR;
+
+		 // state[preyX][preyY] = PREY;
+		 // state[predatorX][predatorY] = specie;
+		 // newState[preyX][preyY] = PREY;
+		 // newState[predatorX][predatorY] = specie;
+		 // agingState[predatorX][predatorY] = WEAK_PREDATOR_STARTING_AGE;
+		 // agingState[preyX][preyY] = PREY_STARTING_AGE;
+		 // newAgingState[predatorX][predatorY] = WEAK_PREDATOR_STARTING_AGE;
+		 // newAgingState[preyX][preyY] = PREY_STARTING_AGE;
+
+	}
+
+	init();
+
+
+
+	function draw() {
+
+		for ( var i = 0 ; i < SIZE ; i++ ) {
+			for ( var j = 0 ; j < SIZE ; j++ ) {
+
+					state[i][j] = newState[i][j];
+					agingState[i][j] = newAgingState[i][j];
+
+					var y = i*tileSize;
+					var x = j*tileSize;
+
+				if (state[i][j] == 0) {
+					ctx.moveTo(x,y);
+					ctx.fillStyle = BACKGROUND_COLOR;
+					ctx.fillRect(x,y,x+tileSize,y+tileSize);
+					
+				}
+				if (state[i][j] == PREY) {
+					ctx.moveTo(x,y);
+					ctx.fillStyle = PREY_COLOR;
+					ctx.fillRect(x,y,x+tileSize,y+tileSize);
+					
+				}
+				if (state[i][j] == WEAK_PREDATOR) {
+					ctx.moveTo(x,y);
+					ctx.fillStyle = WEAK_PREDATOR_COLOR;
+					ctx.fillRect(x,y,x+tileSize,y+tileSize);
+					
+				}if (state[i][j] == STRONG_PREDATOR) {
+					ctx.moveTo(x,y);
+					ctx.fillStyle = STRONG_PREDATOR_COLOR;
+					ctx.fillRect(x,y,x+tileSize,y+tileSize);
+					
+				}
+			}
+		}
+
+		ctx.stroke();
+		
+	}
+
+	draw();
+
+	$("button[name=function]").click(function() {
+
+		transitionFunction();
+			
+	});
+
+	function transitionFunction() {
+
+		for (var i = 0; i < state.length; i++) {1
+			for (var j = 0; j < state[i].length; j++) {
+					checkNeighboorhood(i,j);
+			}
+		}
+		iterationCounter++;
+		draw();
+	}
+
+
+	$("button[name=evolve]").click(function() {
+		setInterval(transitionFunction,TIMER);
+	});
+
+	function checkNeighboorhood(i,j) {
+
+		var newI;
+		var newJ;
+
+
+		if ( state[i][j] == PREY ) {
+
+				var direction = chooseEscapingDirection(i,j);
+
+				switch (direction) {
+					case NORTH:
+					newI = ( i - 1 + SIZE ) % SIZE;
+					newJ = j;
+					break;
+
+					case SOUTH:
+					newI = ( i + 1 + SIZE ) % SIZE;
+					newJ = j;
+					break;
+					
+					case EAST:
+					newI = i;
+					newJ = ( j + 1 + SIZE ) % SIZE;
+					break;
+
+					case WEST:
+					newI = i;
+					newJ = ( j - 1 + SIZE ) % SIZE;
+					break;
+				}
+
+				if ( state[newI][newJ] == WATER ) {
+					newState[newI][newJ] = PREY;
+					newState[i][j] = WATER;
+					newAgingState[i][j] = 0;
+					state[newI][newJ] = -1;
+					state[i][j] = -1;
+					
+				if ( agingState[i][j] > breedingAges[PREY] ) {
+					newAgingState[i][j] = PREY_STARTING_AGE;
+					newAgingState[newI][newJ] = PREY_STARTING_AGE; 
+					newState[i][j] = PREY;
+					speciesCount[PREY]++;
+					state[i][j] = -1;
+				} else {
+					newAgingState[newI][newJ] = agingState[i][j] + PREY_BREEDING_STEP; 
+					agingState[i][j] = 0;
+				}
+			} 
+
+			
+		} else if ( state[i][j] > PREY ) {	
+
+			var currentPredator = state[i][j];
+			var direction = chooseChasingDirection(i,j,currentPredator);
+
+				switch (direction) {
+					case NORTH:
+					newI = ( i - 1 + SIZE ) % SIZE;
+					newJ = j;
+					break;
+
+					case SOUTH:
+					newI = ( i + 1 + SIZE ) % SIZE;
+					newJ = j;
+					break;
+					
+					case EAST:
+					newI = i;
+					newJ = ( j + 1 + SIZE ) % SIZE;
+					break;
+
+					case WEST:
+					newI = i;
+					newJ = ( j - 1 + SIZE ) % SIZE;
+					break;
+				}
+
+				
+			// is a prey
+			var prey = state[newI][newJ];
+			if ( prey < currentPredator && prey > WATER ) {
+				
+				newState[newI][newJ] = currentPredator;
+				newState[i][j] = WATER;
+				newAgingState[newI][newJ] = agingState[i][j] + WEAK_PREDATOR_BREEDING_STEP;
+				state[newI][newJ] = -1;
+				speciesCount[prey]--;
+				state[i][j] = -1;
+			}
+
+
+			
+			if ( state[newI][newJ] == WATER ) {
+				newState[newI][newJ] = currentPredator;
+				newState[i][j] = WATER;
+				newAgingState[i][j] = 0;
+				state[newI][newJ] = -1;
+				state[i][j] = -1
+				if ( agingState[i][j] > breedingAges[currentPredator] ) {
+					newState[i][j] = currentPredator;
+					newAgingState[i][j] = WEAK_PREDATOR_STARTING_AGE;
+					newAgingState[newI][newJ] = WEAK_PREDATOR_STARTING_AGE;
+					state[i][j] = -1;
+					speciesCount[currentPredator]++;
+				} else if ( agingState[i][j] < WEAK_PREDATOR_STARVING_AGE ) {
+						newState[newI][newJ] = WATER;
+						newAgingState[newI][newJ] = 0;
+						speciesCount[currentPredator]--;
+						state[i][j] = -1;
+				} else {
+					newAgingState[newI][newJ] = agingState[i][j] - WEAK_PREDATOR_STARVING_STEP;
+					agingState[i][j] = 0;
+					state[i][j] = -1;
+				}
+
+			}
+
+			
+
+		}
+
+
+	}
+
+
+	function chooseEscapingDirection(i,j) {
+
+		
+
+
+		for (var k = 0; k < DIRECTIONS.length; k++) {
+			
+				switch (DIRECTIONS[k]) {
+					case NORTH:
+					newI = ( i - 1 + SIZE ) % SIZE;
+					newJ = j;
+					var sightDistanceRow =  sightDistance[PREY];
+					for ( var c = 0; c < sightDistanceRow; c++ ) {
+						if ( findMenace(newI,newJ) ) {	
+							// console.log('spotted and running SOUTH');
+							return SOUTH;
+						}
+						newI = ( newI - 1 + SIZE ) % SIZE;
+					}
+
+					break;
+
+					case SOUTH:
+					newI = ( i + 1 + SIZE ) % SIZE;
+					newJ = j;
+					var sightDistanceRow =  sightDistance[PREY];
+					for ( var c = 0; c < sightDistanceRow; c++ ) {
+						if ( findMenace(newI,newJ) ) {	
+							// console.log('spotted and running NORTH');
+							return NORTH;
+						}
+						newI = ( newI + 1 + SIZE ) % SIZE;
+					}
+
+
+					break;
+					
+					case EAST:
+					newI = i;
+					var sightDistanceColumn =  sightDistance[PREY];
+					for (var c = 0 ; c < sightDistanceColumn ; c++) {
+						if ( findMenace(newI,newJ) ) {
+						// console.log('spotted and running WEST');	
+							return WEST;
+						}
+						newJ = ( newJ + 1 + SIZE ) % SIZE;
+					};
+
+
+
+
+					break;
+
+					case WEST:
+					newJ = ( j - 1 + SIZE ) % SIZE;
+					var sightDistanceColumn =  sightDistance[PREY];
+					for (var c = 0 ; c < sightDistanceColumn ; c++) {
+						if ( findMenace(newI,newJ) ) {
+							// console.log('spotted and running EAST');
+							return EAST;
+						}
+						newJ = ( newJ - 1 + SIZE ) % SIZE;
+					};
+				}
+				
+		}
+
+
+		var random = Math.floor( Math.random() * DIRECTIONS.length );
+	
+		return DIRECTIONS[random];
+
+
+	}
+
+	function chooseChasingDirection(i,j,currentPredator) {
+
+		var randomIndex = Math.floor( Math.random() * DIRECTIONS.length );
+
+		for (var k = 0; k < DIRECTIONS.length; k++) {
+			
+				switch (DIRECTIONS[randomIndex]) {
+					case NORTH:
+					newI = ( i - 1 + SIZE ) % SIZE;
+					newJ = j;
+					var sightDistanceRow = sightDistance[currentPredator];
+					for ( var c = 0; c < sightDistanceRow; c++ ) {
+						if ( findPrey(newI,newJ,currentPredator ) ) {
+							// console.log('spotted and chasing NORTH');
+							return NORTH;
+						}
+						newI = ( newI - 1 + SIZE ) % SIZE;
+					}
+
+					break;
+
+					case SOUTH:
+					newI = ( i + 1 + SIZE ) % SIZE;
+					newJ = j;
+					var sightDistanceRow =  sightDistance[currentPredator];
+					for ( var c = 0; c < sightDistanceRow; c++ ) {
+						if ( findPrey(newI,newJ,currentPredator ) ) {
+							// console.log('spotted and chasing SOUTH');
+							return SOUTH;
+						}
+						newI = ( newI + 1 + SIZE ) % SIZE;
+					}
+
+
+					break;
+					
+					case EAST:
+					newI = i;
+					newJ = ( j + 1 + SIZE ) % SIZE;
+					var sightDistanceColumn =  sightDistance[currentPredator];
+					for (var c = 0 ; c < sightDistanceColumn ; c++) {
+						if ( findPrey(newI,newJ,currentPredator ) ) {
+							// console.log('spotted and chasing EAST');
+							return EAST;
+						}
+						newJ = ( newJ + 1 + SIZE ) % SIZE;
+					};
+
+
+					break;
+
+					case WEST:
+					newI = i;
+					newJ = ( j - 1 + SIZE ) % SIZE;
+					var sightDistanceColumn =  sightDistance[currentPredator];
+					for (var c = 0 ; c < sightDistanceColumn ; c++) {
+						if ( findPrey(newI,newJ,currentPredator ) ) {
+							// console.log('spotted and chasing WEST');
+							return WEST;
+						}
+						newJ = ( newJ - 1 + SIZE ) % SIZE;
+					};
+				}
+				randomIndex = ( randomIndex + 1 ) % DIRECTIONS.length;
+		}
+
+
+		var random = Math.floor( Math.random() * DIRECTIONS.length );
+	
+		return DIRECTIONS[random];
+
+
+	}
+
+	function findMenace(i,j) {
+		// console.log("checking Predator in " + i + " " + j) 
+		if ( state[i][j] >= WEAK_PREDATOR  ) {
+			return true;
+		} else return false;
+	}
+
+	function findPrey(i,j,currentPredator) {
+		// console.log("checking prey in " + i + " " + j); 
+		if ( state[i][j] < currentPredator && state[i][j] > WATER ) {
+			return true;
+		} else return false;
+	}
+
+	
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+
+        var data = [];
+        
+        $('#container').highcharts({
+            chart: {
+                type: 'spline',
+                animation: Highcharts.svg, // don't animate in old IE
+                marginRight: 10,
+                events: {
+                    load: function () {
+
+                        // set up the updating of the chart each second
+                        var strongPredatoSerie = this.series[0];
+                        var preySerie = this.series[1];
+                        var weakPredatorSerie = this.series[2];
+                        setInterval(function () {
+                            var x = iterationCounter, // current time
+                            	y = speciesCount[STRONG_PREDATOR];
+                            strongPredatoSerie.addPoint([x, y]);
+                            	y = speciesCount[PREY];
+                            preySerie.addPoint([x, y]);
+                            	y = speciesCount[WEAK_PREDATOR];
+                            weakPredatorSerie.addPoint([x, y]);
+
+
+                        }, 1000);
+                    }
+                }
+            },
+            title: {
+                text: 'Species Population'
+            },
+            xAxis: {
+                type: 'Iteration',
+                tickPixelInterval: 150,
+            },
+            yAxis: {
+                title: {
+                    text: 'Species'
+                },
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#808080'
+                }]
+            },
+            tooltip: {
+                formatter: function () {
+                    return '<b>' + this.series.name + '</b><br/>' +
+            			this.x + '<br/>' + this.y;
+                }
+            },
+            legend: {
+                enabled: false
+            },
+            exporting: {
+                enabled: false
+            },
+            series: [{
+                name: 'Strong-Predator',
+                color: STRONG_PREDATOR_COLOR,
+                data: [iterationCounter,speciesCount[STRONG_PREDATOR]]
+            },{
+                name: 'Prey',
+                color: PREY_COLOR,
+                data: [iterationCounter,speciesCount[PREY]]
+            },{
+                name: 'Weak-Predator',
+                color: WEAK_PREDATOR_COLOR,
+                data: [iterationCounter,speciesCount[WEAK_PREDATOR]]
+            }]	
+        });
+    
+
+	
+	
+});
+
+
+</script>
+

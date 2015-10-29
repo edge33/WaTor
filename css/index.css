@@ -1,0 +1,19 @@
+html,body {
+	height: 100%;
+	width: 100%;
+}
+
+div {
+	display: inline-block;
+	float: left;
+}
+
+#display {
+	width: 50%;
+	margin-right: 5%
+}
+
+#function {
+	margin-top: 0px;
+	height: 100%;
+}
