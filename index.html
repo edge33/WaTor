@@ -22,7 +22,7 @@ Your browser does not support the HTML5 canvas tag.</canvas>
 	Select Strong Predator Color<input name="strong-predator-color" class="color" size="5"><br>
 	Select Prey Color<input name="prey-color" class="color" size="5"><br>
 	Select BackgroundColor Color<input name="background-color" class="color" size="5"><br>
-	Weak Predator Breeding Age:<input name="weak-predator-breeding-age" type="range" min="1" max="10" value="6"><input name="weak-predator-breeding-age" type="text" maxLength="2" size="2" value="6" disabled><br>
+	Weak Predator Breeding Age:<input name="weak-predator-breeding-age" type="range" min="1" max="10" value="5"><input name="weak-predator-breeding-age" type="text" maxLength="2" size="2" value="5" disabled><br>
 	Strong Predator Breeding Age:<input name="strong-predator-breeding-age" type="range" min="1" max="10" value="3"><input name="strong-predator-breeding-age" type="text" maxLength="2" size="2" value="3" disabled><br>
 	Prey Breeding Age:<input name="prey-breeding-age" type="range" min="1" max="10" value="2"><input name="prey-breeding-age" type="text" maxLength="2" size="2" value="2" disabled><br>
 	<div id="container" style="min-width: 410px; height: 400px; margin: 0 auto"></div>
@@ -40,12 +40,12 @@ $(function() {
 	var WEST = 3;
 	var DIRECTIONS = [ NORTH, SOUTH, EAST, WEST] ;
 
-	var SIZE = 100	;
-	var TIMER = 100;
+	var SIZE = 100;
+	var TIMER = 300;
 
-	var PREY_PERCENTAGE = 0.60;
-	var WEAK_PREDATOR_PERCENTAGE = 0.10;
-	var STRONG_PREDATOR_PERCENTAGE = 0.05;
+	var PREY_PERCENTAGE = 0.3;
+	var WEAK_PREDATOR_PERCENTAGE = 0.2;
+	var STRONG_PREDATOR_PERCENTAGE = 0.0;
 	
 	var WATER = 0;
 	var PREY = 1;
@@ -62,7 +62,7 @@ $(function() {
 	var sightDistance = new Array(4);
 	sightDistance[WATER] = 0;
 	sightDistance[PREY] = 5;
-	sightDistance[WEAK_PREDATOR] = 3;
+	sightDistance[WEAK_PREDATOR] = 1;
 	sightDistance[STRONG_PREDATOR] = 4;
 
 
@@ -70,16 +70,17 @@ $(function() {
 	var PREY_BREEDING_STEP = 1;
 	
 
-	var WEAK_PREDATOR_STARTING_AGE = 1;
 
 //cancellare---------------
 	// var WEAK_PREDATOR_STARTING_AGE = 100;
 	//breedingAges[WEAK_PREDATOR] = 100000;
 
 
-	var WEAK_PREDATOR_BREEDING_STEP = 1;
+	var WEAK_PREDATOR_BREEDING_STEP = 2;
 	var WEAK_PREDATOR_STARVING_STEP = 1;
 	var WEAK_PREDATOR_STARVING_AGE = 1;
+
+	var WEAK_PREDATOR_STARTING_AGE = 1;
 	
 	var STRONG_PREDATOR_STARTING_AGE = 1;
 
@@ -178,12 +179,17 @@ $(function() {
 
 	function init() {
 
+		
 		var PreyToLocate = Math.floor(SIZE * SIZE * PREY_PERCENTAGE);
 		var weakPredatorsToLocate = Math.floor(SIZE * SIZE * WEAK_PREDATOR_PERCENTAGE);
 		var strongPredatorsToLocate = Math.floor(SIZE * SIZE * STRONG_PREDATOR_PERCENTAGE);
-		// var PreyToLocate = 0;
-		// var weakPredatorsToLocate = 0;
-		// var strongPredatorsToLocate = 0;
+		
+
+		/* var PreyToLocate = 9999;
+		var weakPredatorsToLocate = 1;
+		var strongPredatorsToLocate = 0;
+		 */
+		
 		var placed = false;
 
 		speciesCount[PREY] = PreyToLocate;
@@ -389,71 +395,82 @@ $(function() {
 			
 		} else if ( state[i][j] > PREY ) {	
 
+			
 			var currentPredator = state[i][j];
 			var direction = chooseChasingDirection(i,j,currentPredator);
-
-				switch (direction) {
-					case NORTH:
-					newI = ( i - 1 + SIZE ) % SIZE;
-					newJ = j;
-					break;
-
-					case SOUTH:
-					newI = ( i + 1 + SIZE ) % SIZE;
-					newJ = j;
-					break;
-					
-					case EAST:
-					newI = i;
-					newJ = ( j + 1 + SIZE ) % SIZE;
-					break;
-
-					case WEST:
-					newI = i;
-					newJ = ( j - 1 + SIZE ) % SIZE;
-					break;
-				}
-
+			
+			switch (direction) {
+				case NORTH:
+				newI = ( i - 1 + SIZE ) % SIZE;
+				newJ = j;
+				break;
 				
-			// is a prey
+				case SOUTH:
+				newI = ( i + 1 + SIZE ) % SIZE;
+				newJ = j;
+				break;
+				
+				case EAST:
+				newI = i;
+				newJ = ( j + 1 + SIZE ) % SIZE;
+				break;
+				
+				case WEST:
+				newI = i;
+				newJ = ( j - 1 + SIZE ) % SIZE;
+				break;
+			}
+			
+			newAgingState[newI][newJ] = agingState[i][j]; 
+
+			//STEP 1: TRY TO CHASE A PREY
 			var prey = state[newI][newJ];
 			if ( prey < currentPredator && prey > WATER ) {
-				
 				newState[newI][newJ] = currentPredator;
 				newState[i][j] = WATER;
-				newAgingState[newI][newJ] = agingState[i][j] + WEAK_PREDATOR_BREEDING_STEP;
+				newAgingState[newI][newJ] += WEAK_PREDATOR_BREEDING_STEP;
 				state[newI][newJ] = -1;
 				speciesCount[prey]--;
 				state[i][j] = -1;
+				// console.log("ate aging -> " + newAgingState[newI][newJ])
+				if ( agingState[i][j] > breedingAges[currentPredator] ) {
+					// console.log("breed")
+					newState[i][j] = currentPredator;
+					var currentAge = agingState[i][j];
+					newAgingState[i][j] =  WEAK_PREDATOR_STARTING_AGE;
+					newAgingState[newI][newJ] = WEAK_PREDATOR_STARTING_AGE;
+					state[i][j] = -1;
+					speciesCount[currentPredator]++;
+				}
 			}
-
-
 			
+			//STEP 2: LOSE ENERGY AT EVERY STEP
+			newAgingState[newI][newJ] -= WEAK_PREDATOR_STARVING_STEP;
+						
 			if ( state[newI][newJ] == WATER ) {
+				// console.log("no eat")
 				newState[newI][newJ] = currentPredator;
 				newState[i][j] = WATER;
 				newAgingState[i][j] = 0;
 				state[newI][newJ] = -1;
 				state[i][j] = -1
 				if ( agingState[i][j] > breedingAges[currentPredator] ) {
+					// console.log("breed")
 					newState[i][j] = currentPredator;
-					newAgingState[i][j] = WEAK_PREDATOR_STARTING_AGE;
+					var currentAge = agingState[i][j];
+					newAgingState[i][j] =  WEAK_PREDATOR_STARTING_AGE;
 					newAgingState[newI][newJ] = WEAK_PREDATOR_STARTING_AGE;
 					state[i][j] = -1;
 					speciesCount[currentPredator]++;
 				} else if ( agingState[i][j] < WEAK_PREDATOR_STARVING_AGE ) {
-						newState[newI][newJ] = WATER;
-						newAgingState[newI][newJ] = 0;
-						speciesCount[currentPredator]--;
-						state[i][j] = -1;
-				} else {
-					newAgingState[newI][newJ] = agingState[i][j] - WEAK_PREDATOR_STARVING_STEP;
-					agingState[i][j] = 0;
+					// console.log("die")
+					newState[newI][newJ] = WATER;
+					newAgingState[newI][newJ] = 0;
+					speciesCount[currentPredator]--;
 					state[i][j] = -1;
 				}
-
 			}
-
+			
 			
 
 		}
@@ -603,12 +620,8 @@ $(function() {
 				randomIndex = ( randomIndex + 1 ) % DIRECTIONS.length;
 		}
 
-
 		var random = Math.floor( Math.random() * DIRECTIONS.length );
-	
 		return DIRECTIONS[random];
-
-
 	}
 
 	function findMenace(i,j) {
